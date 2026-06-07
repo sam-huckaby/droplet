@@ -18,12 +18,6 @@ This project is beta. Breaking changes are acceptable until the project exits be
 - WebAuthn: `@simplewebauthn/server`
 - App sessions: ES256 JWTs signed with ECDSA P-256
 
-## Vendor Source
-
-`vendor/alchemy` and `vendor/effect` are checked in so implementation agents can inspect source before relying on APIs.
-
-The app dependency uses `effect@beta`. The vendored Effect upstream currently reports v3 on `main`, so confirm any v4 source branch/tag before using source-specific v4 APIs.
-
 ## Configuration
 
 Copy the example env file:
@@ -223,7 +217,7 @@ bun run check
 bun run test
 ```
 
-Do not run bare `bun test`; it discovers vendored repository tests under `vendor/`.
+Do not run bare `bun test`; it may discover ignored local workspace directories such as `vendor/`.
 
 ## Beta Limitations
 
