@@ -7,11 +7,77 @@ export function htmlPage(title: string, body: string): Response {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)}</title>
   <style>
-    :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, sans-serif; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; }
-    main { width: min(92vw, 34rem); }
-    .panel { border: 1px solid color-mix(in srgb, currentColor 16%, transparent); border-radius: 18px; padding: 2rem; }
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --surface: #ffffff;
+      --surface-soft: #f9fafb;
+      --border: #d9dee7;
+      --border-soft: #edf0f4;
+      --text: #172033;
+      --muted: #647084;
+      --accent: #2563eb;
+      --green: #15803d;
+      --green-bg: #dcfce7;
+      --red: #b91c1c;
+      --red-bg: #fee2e2;
+      --amber: #b45309;
+      --amber-bg: #fef3c7;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); }
+    main { width: min(96vw, 1180px); margin: 0 auto; padding: 2rem 0 3rem; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { font-size: clamp(2rem, 4vw, 3rem); letter-spacing: -0.04em; margin-bottom: 0.4rem; }
+    h2 { font-size: 1.05rem; margin-bottom: 0.35rem; }
+    p { color: var(--muted); line-height: 1.55; }
+    a { color: var(--accent); }
     button, input { font: inherit; }
+    input { width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 0.55rem 0.7rem; background: var(--surface); color: var(--text); }
+    input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 22%, transparent); border-color: var(--accent); }
+    label { display: grid; gap: 0.35rem; color: var(--muted); font-size: 0.9rem; }
+    button { border: 1px solid var(--border); border-radius: 10px; padding: 0.55rem 0.85rem; background: var(--surface); color: var(--text); cursor: pointer; }
+    button:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+    th { text-align: left; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); background: var(--surface-soft); }
+    th, td { padding: 0.8rem 0.9rem; border-bottom: 1px solid var(--border-soft); vertical-align: middle; }
+    tbody tr:hover { background: color-mix(in srgb, var(--surface-soft) 70%, transparent); }
+    code { border: 1px solid var(--border-soft); border-radius: 6px; padding: 0.1rem 0.3rem; background: var(--surface-soft); }
+    .panel, .card { border: 1px solid var(--border); border-radius: 18px; background: var(--surface); box-shadow: 0 12px 28px rgb(15 23 42 / 0.05); }
+    .panel { padding: 2rem; }
+    .panel-narrow { width: min(92vw, 34rem); margin: 12vh auto 0; }
+    .admin-shell { display: grid; gap: 1.2rem; }
+    .admin-header { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; margin-bottom: 0.4rem; }
+    .admin-header p { margin-bottom: 0; }
+    .card { overflow: hidden; }
+    .card-header { padding: 1.1rem 1.25rem 0.8rem; border-bottom: 1px solid var(--border-soft); background: linear-gradient(180deg, var(--surface), var(--surface-soft)); }
+    .card-header p { margin-bottom: 0; font-size: 0.92rem; }
+    .card-body { padding: 1.2rem 1.25rem; }
+    .table-wrap { overflow-x: auto; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: end; }
+    .checkbox-row { display: flex; align-items: center; gap: 0.5rem; color: var(--text); }
+    .checkbox-row input { width: auto; }
+    .button-primary { background: var(--accent); border-color: var(--accent); color: white; }
+    .button-muted { color: var(--muted); }
+    .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 0.22rem 0.55rem; font-size: 0.78rem; font-weight: 650; white-space: nowrap; }
+    .badge-green { background: var(--green-bg); color: var(--green); }
+    .badge-red { background: var(--red-bg); color: var(--red); }
+    .badge-amber { background: var(--amber-bg); color: var(--amber); }
+    .badge-gray { background: var(--surface-soft); color: var(--muted); border: 1px solid var(--border-soft); }
+    .actions { display: flex; gap: 0.45rem; align-items: center; }
+    .actions form { margin: 0; }
+    .icon-button { width: 2.1rem; height: 2.1rem; display: inline-grid; place-items: center; padding: 0; font-weight: 800; font-size: 1rem; }
+    .icon-save { color: var(--green); border-color: color-mix(in srgb, var(--green) 45%, var(--border)); background: var(--green-bg); }
+    .icon-revoke { color: var(--red); border-color: color-mix(in srgb, var(--red) 45%, var(--border)); background: var(--red-bg); }
+    .muted { color: var(--muted); }
+    .empty { text-align: center; color: var(--muted); padding: 1.6rem; }
+    .notice { border-color: color-mix(in srgb, var(--accent) 28%, var(--border)); background: #eff6ff; }
+    @media (max-width: 760px) {
+      main { width: min(94vw, 100%); padding: 1rem 0 2rem; }
+      .admin-header, .form-grid { grid-template-columns: 1fr; display: grid; }
+      th, td { padding: 0.7rem; }
+    }
   </style>
 </head>
 <body><main>${body}</main></body>

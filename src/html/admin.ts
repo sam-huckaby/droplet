@@ -6,10 +6,10 @@ import type { AppUsageSummary, AuditEventRecord, PasskeyRecord, PasskeyUsageSumm
 export function adminLoginPage(allowBootstrap: boolean): Response {
   return htmlPage(
     "Passkey Gate Admin",
-    `<section class="panel">
+    `<section class="panel panel-narrow">
       <h1>Admin</h1>
       <p>Sign in with an admin passkey.</p>
-      <button id="admin-passkey">Use admin passkey</button>
+      <button class="button-primary" id="admin-passkey">Use admin passkey</button>
       ${allowBootstrap ? `<hr><form method="post" action="/api/admin/bootstrap-login"><label>Bootstrap password <input type="password" name="password" autocomplete="current-password" required></label><button type="submit">Use bootstrap password</button></form>` : ""}
     </section>
     ${webauthnScript}
@@ -28,7 +28,7 @@ export function adminLoginPage(allowBootstrap: boolean): Response {
 export function bootstrapAdminPage(): Response {
   return htmlPage(
     "Bootstrap Admin",
-    `<section class="panel">
+    `<section class="panel panel-narrow">
       <h1>Bootstrap recovery</h1>
       <p>You are signed in with the bootstrap password. Create your first admin passkey, then set <code>ALLOW_BOOTSTRAP_PW=false</code>.</p>
       <p>If you already enrolled your admin passkey, log out of bootstrap recovery and sign back in with your passkey.</p>
@@ -44,38 +44,40 @@ export function adminDashboard(passkeys: PasskeyRecord[], audit: AuditEventRecor
       (passkey) => `<tr>
         <td><input data-passkey-label="${escapeHtml(passkey.id)}" value="${escapeHtml(passkey.label)}"></td>
         <td><input data-passkey-email="${escapeHtml(passkey.id)}" type="email" value="${escapeHtml(passkey.email)}"></td>
-        <td>${passkey.isAdmin ? "yes" : "no"}</td>
-        <td>${escapeHtml(passkey.createdAt)}</td><td>${escapeHtml(passkey.lastUsedAt ?? "never")}</td><td>${passkey.revokedAt ? "revoked" : "active"}</td>
-        <td><button data-passkey-save="${escapeHtml(passkey.id)}" type="button">Save</button><form method="post" action="/api/admin/passkeys/${encodeURIComponent(passkey.id)}/revoke"><button type="submit">Revoke</button></form></td>
+        <td>${passkey.isAdmin ? badge("Admin", "green") : badge("User", "gray")}</td>
+        <td>${formatDateTime(passkey.createdAt)}</td><td>${formatDateTime(passkey.lastUsedAt)}</td><td>${passkey.revokedAt ? badge("Revoked", "red") : badge("Active", "green")}</td>
+        <td><div class="actions"><button class="icon-button icon-save" data-passkey-save="${escapeHtml(passkey.id)}" type="button" aria-label="Save passkey changes" title="Save changes">✓</button><form method="post" action="/api/admin/passkeys/${encodeURIComponent(passkey.id)}/revoke"><button class="icon-button icon-revoke" type="submit" aria-label="Revoke passkey" title="Revoke passkey">✕</button></form></div></td>
       </tr>`,
     )
     .join("");
   const auditRows = audit
-    .map((event) => `<tr><td>${escapeHtml(event.createdAt)}</td><td>${escapeHtml(event.eventType)}</td><td>${escapeHtml(event.appId ?? "")}</td><td>${escapeHtml(event.email ?? "")}</td></tr>`)
+    .map((event) => `<tr><td>${formatDateTime(event.createdAt)}</td><td>${escapeHtml(event.eventType)}</td><td>${escapeHtml(event.appId ?? "")}</td><td>${escapeHtml(event.email ?? "")}</td></tr>`)
     .join("");
   const passkeyUsageRows = usage.passkeys
-    .map((item) => `<tr><td>${escapeHtml(item.passkeyId)}</td><td>${escapeHtml(item.email ?? "")}</td><td>${escapeHtml(item.appId)}</td><td>${item.totalLogins}</td><td>${escapeHtml(item.lastLoginAt)}</td></tr>`)
+    .map((item) => `<tr><td>${escapeHtml(item.email ?? "")}</td><td>${escapeHtml(item.appId)}</td><td>${item.totalLogins}</td><td>${formatDateTime(item.lastLoginAt)}</td></tr>`)
     .join("");
   const appUsageRows = usage.apps
-    .map((item) => `<tr><td>${escapeHtml(item.appId)}</td><td>${item.totalLogins}</td><td>${item.uniquePasskeys}</td><td>${escapeHtml(item.lastLoginAt)}</td></tr>`)
+    .map((item) => `<tr><td>${escapeHtml(item.appId)}</td><td>${item.totalLogins}</td><td>${item.uniquePasskeys}</td><td>${formatDateTime(item.lastLoginAt)}</td></tr>`)
     .join("");
 
   return htmlPage(
     "Passkey Gate Admin",
-    `<section>
-      <h1>Passkey Gate</h1>
-      ${createdLink ? `<div class="panel"><h2>Enrollment link</h2><p>This raw link is shown once.</p><p><a href="${escapeHtml(createdLink)}">${escapeHtml(createdLink)}</a></p></div>` : ""}
-      <form method="post" action="/api/admin/logout"><button type="submit">Log out</button></form>
-      <div class="panel"><h2>Create enrollment link</h2><form method="post" action="/api/admin/enrollment-links">
-        <label>Email <input name="defaultEmail" type="email"></label>
-        <label>Label <input name="defaultLabel"></label>
-        <label><input name="createsAdminPasskey" type="checkbox" value="true"> Admin passkey?</label>
-        <button type="submit">Create enrollment link</button>
-      </form></div>
-      <h2>Passkeys</h2><table><thead><tr><th>Label</th><th>Email</th><th>Admin?</th><th>Created</th><th>Last used</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>
-      <h2>Passkey usage by app</h2><table><thead><tr><th>Passkey</th><th>Email</th><th>App</th><th>Total logins</th><th>Last login</th></tr></thead><tbody>${passkeyUsageRows}</tbody></table>
-      <h2>App usage</h2><table><thead><tr><th>App</th><th>Total logins</th><th>Unique passkeys</th><th>Last login</th></tr></thead><tbody>${appUsageRows}</tbody></table>
-      <h2>Recent audit</h2><table><thead><tr><th>Time</th><th>Event</th><th>App</th><th>Email</th></tr></thead><tbody>${auditRows}</tbody></table>
+    `<section class="admin-shell">
+      <div class="admin-header">
+        <div><h1>Passkey Gate</h1><p>Manage passkeys, enrollment links, and recent authentication activity.</p></div>
+        <form method="post" action="/api/admin/logout"><button class="button-muted" type="submit">Log out</button></form>
+      </div>
+      ${createdLink ? `<div class="card notice"><div class="card-header"><h2>Enrollment link</h2><p>This raw link is shown once.</p></div><div class="card-body"><a href="${escapeHtml(createdLink)}">${escapeHtml(createdLink)}</a></div></div>` : ""}
+      <div class="card"><div class="card-header"><h2>Create enrollment link</h2><p>Enrollment links are single-use. Use the admin option only for passkeys that should manage this portal.</p></div><div class="card-body"><form class="form-grid" method="post" action="/api/admin/enrollment-links">
+        <label>Email <input name="defaultEmail" type="email" placeholder="person@example.com"></label>
+        <label>Label <input name="defaultLabel" placeholder="MacBook, iPhone, Security key"></label>
+        <label class="checkbox-row"><input name="createsAdminPasskey" type="checkbox" value="true"> Admin passkey?</label>
+        <button class="button-primary" type="submit">Create enrollment link</button>
+      </form></div></div>
+      ${tableCard("Passkeys", "Update passkey labels and emails, or revoke credentials that should no longer authenticate.", `<table><thead><tr><th>Label</th><th>Email</th><th>Role</th><th>Created</th><th>Last used</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows || emptyRow(7, "No passkeys yet.")}</tbody></table>`)}
+      ${tableCard("Passkey usage by app", "See which enrolled emails are being used with each protected app.", `<table><thead><tr><th>Email</th><th>App</th><th>Total logins</th><th>Last login</th></tr></thead><tbody>${passkeyUsageRows || emptyRow(4, "No app logins yet.")}</tbody></table>`)}
+      ${tableCard("App usage", "High-level login activity grouped by protected app.", `<table><thead><tr><th>App</th><th>Total logins</th><th>Unique passkeys</th><th>Last login</th></tr></thead><tbody>${appUsageRows || emptyRow(4, "No app logins yet.")}</tbody></table>`)}
+      ${tableCard("Recent audit", "Recent authentication and administration events.", `<table><thead><tr><th>Time</th><th>Event</th><th>App</th><th>Email</th></tr></thead><tbody>${auditRows || emptyRow(4, "No audit events yet.")}</tbody></table>`)}
     </section>
     <script>
     for (const button of document.querySelectorAll('[data-passkey-save]')) {
@@ -89,6 +91,33 @@ export function adminDashboard(passkeys: PasskeyRecord[], audit: AuditEventRecor
     }
     </script>`,
   );
+}
+
+function tableCard(title: string, description: string, table: string): string {
+  return `<div class="card"><div class="card-header"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div><div class="table-wrap">${table}</div></div>`;
+}
+
+function emptyRow(colspan: number, message: string): string {
+  return `<tr><td class="empty" colspan="${colspan}">${escapeHtml(message)}</td></tr>`;
+}
+
+function badge(label: string, color: "green" | "red" | "amber" | "gray"): string {
+  return `<span class="badge badge-${color}">${escapeHtml(label)}</span>`;
+}
+
+function formatDateTime(value: string | null): string {
+  if (!value) return `<span class="muted">Never</span>`;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return escapeHtml(value);
+  return `<time datetime="${escapeHtml(value)}" title="${escapeHtml(value)}">${escapeHtml(
+    new Intl.DateTimeFormat("en", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(date),
+  )}</time>`;
 }
 
 export function logoutResponse(): Response {
