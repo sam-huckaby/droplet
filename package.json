@@ -1,0 +1,35 @@
+{
+  "name": "@passkey-gate/client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./worker": "./src/client/worker.ts",
+    "./browser": "./src/client/browser.ts",
+    "./client/worker": "./src/client/worker.ts",
+    "./client/browser": "./src/client/browser.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "generate:key": "bun ./scripts/generate-auth-key.ts",
+    "setup:print": "bun ./scripts/print-setup.ts",
+    "deploy": "bun ./alchemy.run.ts",
+    "destroy": "bun ./alchemy.run.ts --destroy"
+  },
+  "dependencies": {
+    "@simplewebauthn/browser": "latest",
+    "@simplewebauthn/server": "latest",
+    "alchemy": "latest",
+    "effect": "beta",
+    "jose": "latest"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "latest",
+    "@cloudflare/workers-types": "latest",
+    "@types/node": "latest",
+    "typescript": "latest",
+    "vitest": "latest",
+    "wrangler": "latest"
+  }
+}

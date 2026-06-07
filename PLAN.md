@@ -131,6 +131,8 @@ The private key used by the auth service to sign app sessions or exchange tokens
 
 This should be generated per deployment.
 
+For the initial beta, store this as a JSON Web Key for an ECDSA P-256 private key usable with `ES256` signing. The JWK must include private key material and must only be stored as the Cloudflare secret value.
+
 Protected apps should not receive this private key.
 
 Protected apps should verify tokens using the corresponding public key exposed by the auth service.
@@ -168,17 +170,18 @@ Suggested response shape:
   "keys": [
     {
       "kid": "default",
-      "kty": "OKP",
-      "crv": "Ed25519",
+      "kty": "EC",
+      "crv": "P-256",
       "use": "sig",
-      "alg": "EdDSA",
-      "x": "base64url-public-key"
+      "alg": "ES256",
+      "x": "base64url-public-key-x-coordinate",
+      "y": "base64url-public-key-y-coordinate"
     }
   ]
 }
 ```
 
-Use Ed25519 if practical in the Workers runtime and library ecosystem. If Ed25519 becomes awkward, use a Web Crypto-supported asymmetric algorithm and document the reason.
+Use ECDSA P-256 with SHA-256 (`ES256`) for app session signing. This keeps the implementation aligned with broadly supported Web Crypto and JOSE/JWKS tooling while maintaining a high security posture for SaaS deployments.
 
 ---
 
@@ -336,6 +339,8 @@ git subtree add --prefix vendor/effect https://github.com/Effect-TS/effect.git m
 
 If Effect v4 beta lives on a specific branch or tag, use that branch/tag instead of `main`.
 
+As of initial setup, the npm beta package is `effect@4.0.0-beta.78`, while the upstream `main` branch reports `3.21.3` and no matching `4.0.0-beta.78` git tag is exposed. Use the installed beta package for application code, and treat `vendor/effect` as inspectable upstream source until a source-confirmed v4 beta branch or tag is identified.
+
 The agent should consult these source trees directly when building with Alchemy or Effect.
 
 ---
@@ -351,7 +356,7 @@ Router: Hono or Effect-native HTTP if practical
 Language: TypeScript
 WebAuthn: @simplewebauthn/server and @simplewebauthn/browser
 UI: Server-rendered HTML first, optional client-side enhancement
-Package manager: pnpm or bun
+Package manager: bun
 Testing: Vitest or Effect-native testing tools
 ```
 
@@ -367,7 +372,7 @@ Effect is a TypeScript framework for building robust applications with typed eff
 ├── PLAN.md
 ├── README.md
 ├── package.json
-├── pnpm-lock.yaml
+├── bun.lock
 ├── tsconfig.json
 ├── alchemy.run.ts
 ├── src
@@ -1565,19 +1570,21 @@ Acceptance criteria:
 
 ---
 
-### Milestone 3 — Asymmetric Signing
+### Milestone 3 — ES256 Asymmetric Signing
 
 * Add private key loading from `AUTH_PRIVATE_KEY`.
 * Add public key derivation or configured public key handling.
 * Add JWKS/public key endpoint.
 * Add signed token creation.
 * Add signed token verification in client library.
+* Use ECDSA P-256 with SHA-256 (`ES256`) and JOSE-compatible JWT/JWKS encoding.
 
 Acceptance criteria:
 
 * Auth service signs app sessions with private key.
 * Protected app verifies with public key.
 * No shared session secret is required.
+* JWKS exposes `kty: "EC"`, `crv: "P-256"`, `alg: "ES256"`, `x`, `y`, and `kid`.
 
 ---
 
@@ -1900,4 +1907,3 @@ Prefer simple, correct, shippable implementation over compatibility layers.
 * Should passkeys have per-app allow/deny rules?
 
 For the beta, `isAdmin` exists from version one, and only admin passkeys can access the admin portal.
-
