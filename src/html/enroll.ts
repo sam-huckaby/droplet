@@ -8,6 +8,7 @@ export function enrollmentPage(rawToken: string, link: EnrollmentLinkRecord): Re
     `<section class="panel">
       <h1>Enroll passkey</h1>
       ${link.createsAdminPasskey ? "<p><strong>This enrollment link will create an admin passkey.</strong></p>" : ""}
+      ${!link.createsAdminPasskey && link.appId ? `<p>This passkey will grant access to <code>${escapeHtml(link.appId)}</code>.</p>` : ""}
       <label>Email <input id="email" type="email" value="${escapeHtml(link.defaultEmail ?? "")}" required></label>
       <label>Label <input id="label" value="${escapeHtml(link.defaultLabel ?? "")}" required></label>
       <button id="register">Register passkey</button>

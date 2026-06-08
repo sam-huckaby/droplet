@@ -20,6 +20,7 @@ type PasskeyRow = {
   email: string;
   label: string;
   is_admin: number;
+  app_id: string | null;
   created_at: string;
   updated_at: string;
   last_used_at: string | null;
@@ -32,6 +33,7 @@ type EnrollmentRow = {
   default_email: string | null;
   default_label: string | null;
   creates_admin_passkey: number;
+  app_id: string | null;
   created_by_passkey_id: string | null;
   created_via_bootstrap: number;
   created_at: string;
@@ -157,6 +159,7 @@ export class AuthState extends DurableObject<Env> {
     defaultEmail?: string;
     defaultLabel?: string;
     createsAdminPasskey: boolean;
+    appId?: string;
     createdByPasskeyId?: string;
     createdViaBootstrap: boolean;
     expiresAt?: string;
@@ -164,13 +167,14 @@ export class AuthState extends DurableObject<Env> {
     const createdAt = now();
     this.ctx.storage.sql.exec(
       `INSERT INTO enrollment_links
-       (id, token_hash, default_email, default_label, creates_admin_passkey, created_by_passkey_id, created_via_bootstrap, created_at, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, token_hash, default_email, default_label, creates_admin_passkey, app_id, created_by_passkey_id, created_via_bootstrap, created_at, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       input.id,
       input.tokenHash,
       input.defaultEmail ?? null,
       input.defaultLabel ?? null,
       input.createsAdminPasskey ? 1 : 0,
+      input.appId ?? null,
       input.createdByPasskeyId ?? null,
       input.createdViaBootstrap ? 1 : 0,
       createdAt,
@@ -234,11 +238,12 @@ export class AuthState extends DurableObject<Env> {
     email: string;
     label: string;
     isAdmin: boolean;
+    appId?: string;
   }): Promise<PasskeyRecord> {
     const at = now();
     this.ctx.storage.sql.exec(
-      `INSERT INTO passkeys (id, credential_id, public_key, counter, email, label, is_admin, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO passkeys (id, credential_id, public_key, counter, email, label, is_admin, app_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       input.id,
       input.credentialId,
       input.publicKey,
@@ -246,6 +251,7 @@ export class AuthState extends DurableObject<Env> {
       input.email,
       input.label,
       input.isAdmin ? 1 : 0,
+      input.appId ?? null,
       at,
       at,
     );
@@ -342,11 +348,15 @@ export class AuthState extends DurableObject<Env> {
     );
   }
 
-  async listAuditEvents(limit = 100): Promise<AuditEventRecord[]> {
+  async listAuditEvents(limit = 50, offset = 0): Promise<AuditEventRecord[]> {
     return this.ctx.storage.sql
-      .exec<AuditRow>("SELECT * FROM audit_events ORDER BY created_at DESC LIMIT ?", limit)
+      .exec<AuditRow>("SELECT * FROM audit_events ORDER BY created_at DESC LIMIT ? OFFSET ?", limit, offset)
       .toArray()
       .map(mapAudit);
+  }
+
+  async countAuditEvents(): Promise<number> {
+    return this.ctx.storage.sql.exec<{ count: number }>("SELECT COUNT(*) AS count FROM audit_events").toArray()[0]?.count ?? 0;
   }
 
   async countRecentAuditEvents(input: { eventType: string; ip?: string; since: string }): Promise<number> {
@@ -396,6 +406,7 @@ export class AuthState extends DurableObject<Env> {
         email TEXT NOT NULL,
         label TEXT NOT NULL,
         is_admin INTEGER NOT NULL DEFAULT 0,
+        app_id TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         last_used_at TEXT,
@@ -416,6 +427,7 @@ export class AuthState extends DurableObject<Env> {
         default_email TEXT,
         default_label TEXT,
         creates_admin_passkey INTEGER NOT NULL DEFAULT 0,
+        app_id TEXT,
         created_by_passkey_id TEXT,
         created_via_bootstrap INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
@@ -470,6 +482,7 @@ function mapPasskey(row: PasskeyRow): PasskeyRecord {
     email: row.email,
     label: row.label,
     isAdmin: row.is_admin === 1,
+    appId: row.app_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     lastUsedAt: row.last_used_at,
@@ -484,6 +497,7 @@ function mapEnrollment(row: EnrollmentRow): EnrollmentLinkRecord {
     defaultEmail: row.default_email,
     defaultLabel: row.default_label,
     createsAdminPasskey: row.creates_admin_passkey === 1,
+    appId: row.app_id,
     createdByPasskeyId: row.created_by_passkey_id,
     createdViaBootstrap: row.created_via_bootstrap === 1,
     createdAt: row.created_at,

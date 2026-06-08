@@ -68,6 +68,10 @@ The service includes:
 * Each passkey must have an `isAdmin` field.
 * The first passkey created through bootstrap flow must be an admin passkey.
 * Admin-created enrollment links must include an `Admin passkey?` option.
+* Non-admin enrollment links must select exactly one configured `APP_ID`.
+* Admin passkeys can log into any app.
+* Non-admin passkeys can only log into their assigned `APP_ID`.
+* Non-admin passkeys without an assigned `APP_ID` cannot log into any app.
 * Only admin passkeys can log into the admin portal.
 * Admin must be able to update passkey email.
 * Admin must be able to update passkey label.
@@ -313,4 +317,3 @@ vendor/effect
 Use source as the authority over stale examples, memory, or assumptions.
 
 If the vendored source disagrees with documentation, prefer the source and note the discrepancy in comments or implementation notes.
-

@@ -7,12 +7,22 @@ import type { AppConfig, Env } from "../types";
 import { credentialForVerification, rpId } from "../webauthn/options";
 import { createRawSession, getAdminSession, getBootstrapSession, getState, json, readForm, readJson, redirect, requestMeta, sessionCookie } from "./helpers";
 
+const AUDIT_PAGE_SIZES = [50, 100, 500] as const;
+
 export async function handleAdminPage(request: Request, env: Env, config: AppConfig): Promise<Response> {
   const admin = await getAdminSession(request, env);
   if (admin) {
     const state = getState(env);
-    const [passkeys, audit, passkeyUsage, appUsage] = await Promise.all([state.listPasskeys(), state.listAuditEvents(50), state.listPasskeyUsage(), state.listAppUsage()]);
-    return adminDashboard(passkeys, audit, { passkeys: passkeyUsage, apps: appUsage });
+    const auditPage = parseAuditPagination(new URL(request.url).searchParams);
+    const [passkeys, auditTotal, passkeyUsage, appUsage] = await Promise.all([
+      state.listPasskeys(),
+      state.countAuditEvents(),
+      state.listPasskeyUsage(),
+      state.listAppUsage(),
+    ]);
+    const clampedAuditPage = clampAuditPage(auditPage, auditTotal);
+    const audit = await state.listAuditEvents(clampedAuditPage.pageSize, clampedAuditPage.offset);
+    return adminDashboard(passkeys, audit, { passkeys: passkeyUsage, apps: appUsage }, allowedAppIds(config), { ...clampedAuditPage, total: auditTotal });
   }
   const bootstrap = await getBootstrapSession(request, env);
   if (bootstrap) return bootstrapAdminPage();
@@ -28,7 +38,7 @@ export async function handleAdminApi(request: Request, env: Env, config: AppConf
   if (request.method === "POST" && pathname === "/api/admin/logout") return logoutResponse();
   if (request.method === "POST" && pathname === "/api/admin/enrollment-links") return createEnrollmentFromAdmin(request, env, config);
   if (request.method === "GET" && pathname === "/api/admin/passkeys") return requireAdminJson(request, env, async () => json({ ok: true, passkeys: await getState(env).listPasskeys() }));
-  if (request.method === "GET" && pathname === "/api/admin/audit") return requireAdminJson(request, env, async () => json({ ok: true, audit: await getState(env).listAuditEvents(100) }));
+  if (request.method === "GET" && pathname === "/api/admin/audit") return adminAuditJson(request, env);
   const patch = pathname.match(/^\/api\/admin\/passkeys\/([^/]+)$/);
   if (request.method === "PATCH" && patch) return updatePasskey(request, env, patch[1]);
   const revoke = pathname.match(/^\/api\/admin\/passkeys\/([^/]+)\/revoke$/);
@@ -68,26 +78,65 @@ async function createEnrollmentFromAdmin(request: Request, env: Env, config: App
   const admin = await getAdminSession(request, env);
   if (!admin) return new Response("Forbidden", { status: 403 });
   const form = await readForm(request);
+  const createsAdminPasskey = form.createsAdminPasskey === "true";
+  const appId = createsAdminPasskey ? undefined : allowedAppId(form.appId, config);
+  if (!createsAdminPasskey && !appId) return new Response("A valid app is required for non-admin enrollment links", { status: 400 });
   const link = await createEnrollmentLink(env, config, {
     defaultEmail: form.defaultEmail || undefined,
     defaultLabel: form.defaultLabel || undefined,
-    createsAdminPasskey: form.createsAdminPasskey === "true",
+    createsAdminPasskey,
+    appId,
     createdByPasskeyId: admin.passkeyId ?? undefined,
     createdViaBootstrap: false,
   });
-  await getState(env).addAuditEvent({ id: id("audit"), eventType: "enrollment_link_created", passkeyId: admin.passkeyId ?? undefined, metadata: { createsAdminPasskey: form.createsAdminPasskey === "true" }, ...requestMeta(request) });
+  await getState(env).addAuditEvent({ id: id("audit"), eventType: "enrollment_link_created", passkeyId: admin.passkeyId ?? undefined, metadata: { createsAdminPasskey, appId: appId ?? null }, ...requestMeta(request) });
   const [passkeys, audit, passkeyUsage, appUsage] = await Promise.all([getState(env).listPasskeys(), getState(env).listAuditEvents(50), getState(env).listPasskeyUsage(), getState(env).listAppUsage()]);
-  return adminDashboard(passkeys, audit, { passkeys: passkeyUsage, apps: appUsage }, link);
+  const auditTotal = await getState(env).countAuditEvents();
+  return adminDashboard(passkeys, audit, { passkeys: passkeyUsage, apps: appUsage }, allowedAppIds(config), { page: 1, pageSize: 50, total: auditTotal }, link);
+}
+
+async function adminAuditJson(request: Request, env: Env): Promise<Response> {
+  return requireAdminJson(request, env, async () => {
+    const auditPage = parseAuditPagination(new URL(request.url).searchParams);
+    const total = await getState(env).countAuditEvents();
+    const clampedAuditPage = clampAuditPage(auditPage, total);
+    const audit = await getState(env).listAuditEvents(clampedAuditPage.pageSize, clampedAuditPage.offset);
+    return json({ ok: true, audit, page: clampedAuditPage.page, pageSize: clampedAuditPage.pageSize, total });
+  });
 }
 
 async function createEnrollmentLink(
   env: Env,
   config: AppConfig,
-  input: { defaultEmail?: string; defaultLabel?: string; createsAdminPasskey: boolean; createdByPasskeyId?: string; createdViaBootstrap: boolean },
+  input: { defaultEmail?: string; defaultLabel?: string; createsAdminPasskey: boolean; appId?: string; createdByPasskeyId?: string; createdViaBootstrap: boolean },
 ): Promise<string> {
   const raw = secureRandomBase64Url(32);
   await getState(env).createEnrollmentLink({ id: id("enroll"), tokenHash: await sha256Base64Url(raw), ...input });
   return `${config.authOrigin.origin}/enroll?k=${encodeURIComponent(raw)}`;
+}
+
+function allowedAppId(value: string | undefined, config: AppConfig): string | undefined {
+  const appId = value?.trim();
+  if (!appId || !config.allowedApps[appId]) return undefined;
+  return appId;
+}
+
+function allowedAppIds(config: AppConfig): string[] {
+  return Object.keys(config.allowedApps).sort();
+}
+
+export function parseAuditPagination(searchParams: URLSearchParams): { page: number; pageSize: 50 | 100 | 500; offset: number } {
+  const rawPageSize = Number(searchParams.get("auditPageSize") ?? "50");
+  const pageSize = AUDIT_PAGE_SIZES.includes(rawPageSize as 50 | 100 | 500) ? (rawPageSize as 50 | 100 | 500) : 50;
+  const rawPage = Number(searchParams.get("auditPage") ?? "1");
+  const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
+  return { page, pageSize, offset: (page - 1) * pageSize };
+}
+
+function clampAuditPage(input: { page: number; pageSize: 50 | 100 | 500 }, total: number): { page: number; pageSize: 50 | 100 | 500; offset: number } {
+  const totalPages = Math.max(1, Math.ceil(total / input.pageSize));
+  const page = Math.min(input.page, totalPages);
+  return { page, pageSize: input.pageSize, offset: (page - 1) * input.pageSize };
 }
 
 async function adminPasskeyOptions(env: Env, config: AppConfig): Promise<Response> {

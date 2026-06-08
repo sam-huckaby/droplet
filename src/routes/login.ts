@@ -43,6 +43,10 @@ async function loginVerify(request: Request, env: Env, config: AppConfig): Promi
   }
   const verification = await verifyAuthenticationResponse({ response: body.response, expectedChallenge: challenge.challenge, expectedOrigin: config.authOrigin.origin, expectedRPID: rpId(config), credential: credentialForVerification(passkey), requireUserVerification: false });
   if (!verification.verified) return json({ ok: false, error: "Unable to verify passkey" }, { status: 403 });
+  if (!canPasskeyAccessApp(passkey, context.appId)) {
+    await getState(env).addAuditEvent({ id: id("audit"), eventType: "app_login_failed", appId: context.appId, passkeyId: passkey.id, email: passkey.email, metadata: { reason: "app_scope_mismatch" }, ...requestMeta(request) });
+    return json({ ok: false, error: "Unable to verify passkey" }, { status: 403 });
+  }
   await getState(env).markPasskeyUsed(passkey.id, verification.authenticationInfo.newCounter);
   const rawCode = secureRandomBase64Url(32);
   await getState(env).createAuthCode({ id: id("code"), codeHash: await sha256Base64Url(rawCode), appId: context.appId, passkeyId: passkey.id, email: passkey.email, returnTo: context.returnTo, expiresAt: new Date(Date.now() + 5 * 60_000).toISOString() });
@@ -51,4 +55,8 @@ async function loginVerify(request: Request, env: Env, config: AppConfig): Promi
   const redirectTo = new URL(context.returnTo);
   redirectTo.searchParams.set("code", rawCode);
   return json({ ok: true, redirectTo: redirectTo.toString() });
+}
+
+export function canPasskeyAccessApp(passkey: { isAdmin: boolean; appId: string | null }, appId: string): boolean {
+  return passkey.isAdmin || passkey.appId === appId;
 }

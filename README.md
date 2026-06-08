@@ -112,6 +112,7 @@ If all admin passkeys are lost, set `ALLOW_BOOTSTRAP_PW=true` again and repeat t
 - Admin passkey login.
 - One-time enrollment link creation.
 - Admin/non-admin enrollment flag.
+- App-scoped non-admin passkey enrollment.
 - Passkey listing.
 - Passkey email and label updates.
 - Passkey revocation.
@@ -119,7 +120,7 @@ If all admin passkeys are lost, set `ALLOW_BOOTSTRAP_PW=true` again and repeat t
 - Per-passkey app usage summaries.
 - Per-app usage summaries.
 
-Only passkeys with `isAdmin=true` can access the admin portal.
+Only passkeys with `isAdmin=true` can access the admin portal and sign into any app. Non-admin passkeys must be scoped to one configured app and can only sign into that app.
 
 ## Protect An App
 

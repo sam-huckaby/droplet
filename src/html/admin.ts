@@ -38,13 +38,22 @@ export function bootstrapAdminPage(): Response {
   );
 }
 
-export function adminDashboard(passkeys: PasskeyRecord[], audit: AuditEventRecord[], usage: { passkeys: PasskeyUsageSummary[]; apps: AppUsageSummary[] }, createdLink?: string): Response {
+export function adminDashboard(
+  passkeys: PasskeyRecord[],
+  audit: AuditEventRecord[],
+  usage: { passkeys: PasskeyUsageSummary[]; apps: AppUsageSummary[] },
+  appIds: string[],
+  auditPagination: { page: number; pageSize: 50 | 100 | 500; total: number },
+  createdLink?: string,
+): Response {
+  const appOptions = appIds.map((appId) => `<option value="${escapeHtml(appId)}">${escapeHtml(appId)}</option>`).join("");
   const rows = passkeys
     .map(
       (passkey) => `<tr>
         <td><input data-passkey-label="${escapeHtml(passkey.id)}" value="${escapeHtml(passkey.label)}"></td>
         <td><input data-passkey-email="${escapeHtml(passkey.id)}" type="email" value="${escapeHtml(passkey.email)}"></td>
         <td>${passkey.isAdmin ? badge("Admin", "green") : badge("User", "gray")}</td>
+        <td>${passkeyAccess(passkey)}</td>
         <td>${formatDateTime(passkey.createdAt)}</td><td>${formatDateTime(passkey.lastUsedAt)}</td><td>${passkey.revokedAt ? badge("Revoked", "red") : badge("Active", "green")}</td>
         <td><div class="actions"><button class="icon-button icon-save" data-passkey-save="${escapeHtml(passkey.id)}" type="button" aria-label="Save passkey changes" title="Save changes">✓</button><form method="post" action="/api/admin/passkeys/${encodeURIComponent(passkey.id)}/revoke"><button class="icon-button icon-revoke" type="submit" aria-label="Revoke passkey" title="Revoke passkey">✕</button></form></div></td>
       </tr>`,
@@ -68,16 +77,17 @@ export function adminDashboard(passkeys: PasskeyRecord[], audit: AuditEventRecor
         <form method="post" action="/api/admin/logout"><button class="button-muted" type="submit">Log out</button></form>
       </div>
       ${createdLink ? `<div class="card notice"><div class="card-header"><h2>Enrollment link</h2><p>This raw link is shown once.</p></div><div class="card-body"><a href="${escapeHtml(createdLink)}">${escapeHtml(createdLink)}</a></div></div>` : ""}
-      <div class="card"><div class="card-header"><h2>Create enrollment link</h2><p>Enrollment links are single-use. Use the admin option only for passkeys that should manage this portal.</p></div><div class="card-body"><form class="form-grid" method="post" action="/api/admin/enrollment-links">
+      <div class="card"><div class="card-header"><h2>Create enrollment link</h2><p>Enrollment links are single-use. Non-admin passkeys must be scoped to one app.</p></div><div class="card-body"><form class="form-grid enrollment-form" method="post" action="/api/admin/enrollment-links">
         <label>Email <input name="defaultEmail" type="email" placeholder="person@example.com"></label>
         <label>Label <input name="defaultLabel" placeholder="MacBook, iPhone, Security key"></label>
+        <label data-app-scope-field>App access <select name="appId" required>${appOptions}</select></label>
         <label class="checkbox-row"><input name="createsAdminPasskey" type="checkbox" value="true"> Admin passkey?</label>
         <button class="button-primary" type="submit">Create enrollment link</button>
       </form></div></div>
-      ${tableCard("Passkeys", "Update passkey labels and emails, or revoke credentials that should no longer authenticate.", `<table><thead><tr><th>Label</th><th>Email</th><th>Role</th><th>Created</th><th>Last used</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows || emptyRow(7, "No passkeys yet.")}</tbody></table>`)}
+      ${tableCard("Passkeys", "Update passkey labels and emails, or revoke credentials that should no longer authenticate.", `<table><thead><tr><th>Label</th><th>Email</th><th>Role</th><th>Access</th><th>Created</th><th>Last used</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows || emptyRow(8, "No passkeys yet.")}</tbody></table>`)}
       ${tableCard("Passkey usage by app", "See which enrolled emails are being used with each protected app.", `<table><thead><tr><th>Email</th><th>App</th><th>Total logins</th><th>Last login</th></tr></thead><tbody>${passkeyUsageRows || emptyRow(4, "No app logins yet.")}</tbody></table>`)}
       ${tableCard("App usage", "High-level login activity grouped by protected app.", `<table><thead><tr><th>App</th><th>Total logins</th><th>Unique passkeys</th><th>Last login</th></tr></thead><tbody>${appUsageRows || emptyRow(4, "No app logins yet.")}</tbody></table>`)}
-      ${tableCard("Recent audit", "Recent authentication and administration events.", `<table><thead><tr><th>Time</th><th>Event</th><th>App</th><th>Email</th></tr></thead><tbody>${auditRows || emptyRow(4, "No audit events yet.")}</tbody></table>`)}
+      ${auditCard("Recent audit", "Recent authentication and administration events.", `<table><thead><tr><th>Time</th><th>Event</th><th>App</th><th>Email</th></tr></thead><tbody>${auditRows || emptyRow(4, "No audit events yet.")}</tbody></table>`, auditPagination)}
     </section>
     <script>
     for (const button of document.querySelectorAll('[data-passkey-save]')) {
@@ -89,6 +99,16 @@ export function adminDashboard(passkeys: PasskeyRecord[], audit: AuditEventRecor
         if (response.ok) location.reload(); else alert('Unable to update passkey');
       });
     }
+    const adminCheckbox = document.querySelector('input[name="createsAdminPasskey"]');
+    const appScopeField = document.querySelector('[data-app-scope-field]');
+    const appScopeSelect = appScopeField?.querySelector('select');
+    function syncAppScopeField() {
+      const isAdmin = adminCheckbox?.checked ?? false;
+      if (appScopeField) appScopeField.hidden = isAdmin;
+      if (appScopeSelect) appScopeSelect.disabled = isAdmin;
+    }
+    adminCheckbox?.addEventListener('change', syncAppScopeField);
+    syncAppScopeField();
     </script>`,
   );
 }
@@ -97,12 +117,37 @@ function tableCard(title: string, description: string, table: string): string {
   return `<div class="card"><div class="card-header"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div><div class="table-wrap">${table}</div></div>`;
 }
 
+function auditCard(title: string, description: string, table: string, pagination: { page: number; pageSize: 50 | 100 | 500; total: number }): string {
+  return `<div class="card"><div class="card-header"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div>${auditPaginationControls(pagination)}</div><div class="table-wrap">${table}</div></div>`;
+}
+
+function auditPaginationControls(pagination: { page: number; pageSize: 50 | 100 | 500; total: number }): string {
+  const totalPages = Math.max(1, Math.ceil(pagination.total / pagination.pageSize));
+  const previous = pagination.page > 1 ? `<a class="pagination-link" href="${auditPageUrl(pagination.page - 1, pagination.pageSize)}">Previous</a>` : `<span class="pagination-link disabled">Previous</span>`;
+  const next = pagination.page < totalPages ? `<a class="pagination-link" href="${auditPageUrl(pagination.page + 1, pagination.pageSize)}">Next</a>` : `<span class="pagination-link disabled">Next</span>`;
+  const pageSizeOptions = [50, 100, 500]
+    .map((size) => `<option value="${size}"${size === pagination.pageSize ? " selected" : ""}>${size}</option>`)
+    .join("");
+  const status = pagination.total === 0 ? "No audit events" : `Page ${pagination.page} of ${totalPages}`;
+  return `<div class="pagination"><form method="get" action="/admin"><input type="hidden" name="auditPage" value="1"><label>Events per page <select name="auditPageSize" onchange="this.form.submit()">${pageSizeOptions}</select></label></form><span class="muted">${escapeHtml(status)}</span><div class="pagination-actions">${previous}${next}</div></div>`;
+}
+
+function auditPageUrl(page: number, pageSize: number): string {
+  return `/admin?auditPage=${page}&auditPageSize=${pageSize}`;
+}
+
 function emptyRow(colspan: number, message: string): string {
   return `<tr><td class="empty" colspan="${colspan}">${escapeHtml(message)}</td></tr>`;
 }
 
 function badge(label: string, color: "green" | "red" | "amber" | "gray"): string {
   return `<span class="badge badge-${color}">${escapeHtml(label)}</span>`;
+}
+
+function passkeyAccess(passkey: PasskeyRecord): string {
+  if (passkey.isAdmin) return badge("All apps", "green");
+  if (passkey.appId) return `<code>${escapeHtml(passkey.appId)}</code>`;
+  return badge("No app access", "amber");
 }
 
 function formatDateTime(value: string | null): string {

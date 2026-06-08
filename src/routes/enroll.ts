@@ -33,7 +33,7 @@ async function enrollOptions(request: Request, env: Env, config: AppConfig): Pro
   if (!email || !label) return json({ ok: false, error: "Email and label are required" }, { status: 400 });
   const options = await registrationOptions(config, { email, label });
   const challengeId = id("chal");
-  await getState(env).createChallenge({ id: challengeId, challenge: options.challenge, type: "registration", context: { tokenHash, linkId: link.id, email, label }, expiresAt: new Date(Date.now() + 5 * 60_000).toISOString() });
+  await getState(env).createChallenge({ id: challengeId, challenge: options.challenge, type: "registration", context: { tokenHash, linkId: link.id, email, label, appId: link.appId }, expiresAt: new Date(Date.now() + 5 * 60_000).toISOString() });
   return json({ ok: true, challengeId, options });
 }
 
@@ -41,7 +41,7 @@ async function enrollVerify(request: Request, env: Env, config: AppConfig): Prom
   const body = await readJson<{ challengeId: string; response: RegistrationResponseJSON }>(request);
   const challenge = await getState(env).consumeChallenge(body.challengeId, "registration");
   if (!challenge) return json({ ok: false, error: "Unable to verify passkey" }, { status: 400 });
-  const context = challenge.context as { tokenHash: string; linkId: string; email: string; label: string };
+  const context = challenge.context as { tokenHash: string; linkId: string; email: string; label: string; appId: string | null };
   const link = await getState(env).getUsableEnrollmentLink(context.tokenHash);
   if (!link || link.id !== context.linkId) return json({ ok: false, error: "Invalid or expired enrollment link" }, { status: 400 });
   const verification = await verifyRegistrationResponse({ response: body.response, expectedChallenge: challenge.challenge, expectedOrigin: config.authOrigin.origin, expectedRPID: rpId(config), requireUserVerification: false });
@@ -54,9 +54,10 @@ async function enrollVerify(request: Request, env: Env, config: AppConfig): Prom
     email: context.email,
     label: context.label,
     isAdmin: link.createsAdminPasskey,
+    appId: link.createsAdminPasskey ? undefined : (context.appId ?? undefined),
   });
   await getState(env).consumeEnrollmentLink(link.id, passkey.id);
-  await getState(env).addAuditEvent({ id: id("audit"), eventType: "passkey_registered", passkeyId: passkey.id, email: passkey.email, metadata: { isAdmin: passkey.isAdmin }, ...requestMeta(request) });
+  await getState(env).addAuditEvent({ id: id("audit"), eventType: "passkey_registered", passkeyId: passkey.id, email: passkey.email, metadata: { isAdmin: passkey.isAdmin, appId: passkey.appId }, ...requestMeta(request) });
   await getState(env).addAuditEvent({ id: id("audit"), eventType: "enrollment_link_consumed", passkeyId: passkey.id, email: passkey.email, ...requestMeta(request) });
   return json({ ok: true, passkeyId: passkey.id });
 }

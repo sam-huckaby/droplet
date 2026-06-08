@@ -2,6 +2,7 @@ import { sha256Base64Url } from "../crypto/hashing";
 import { signAppSession } from "../crypto/signing";
 import { id } from "../crypto/random";
 import type { AppConfig, Env } from "../types";
+import { canPasskeyAccessApp } from "./login";
 import { getState, json, readJson, requestMeta } from "./helpers";
 
 export async function handleTokenExchange(request: Request, env: Env, config: AppConfig): Promise<Response> {
@@ -20,6 +21,10 @@ export async function handleTokenExchange(request: Request, env: Env, config: Ap
   if (!passkey || passkey.revokedAt) {
     await getState(env).addAuditEvent({ id: id("audit"), eventType: "token_exchange_revoked_or_missing_passkey", appId: body.appId, passkeyId: code.passkeyId, metadata: { reason: passkey ? "revoked_passkey" : "missing_passkey" }, ...requestMeta(request) });
     return json({ ok: false, error: "Invalid app or code", reason: passkey ? "revoked_passkey" : "missing_passkey" }, { status: 403 });
+  }
+  if (!canPasskeyAccessApp(passkey, body.appId)) {
+    await getState(env).addAuditEvent({ id: id("audit"), eventType: "token_exchange_forbidden_for_passkey_app", appId: body.appId, passkeyId: passkey.id, email: passkey.email, metadata: { reason: "app_scope_mismatch" }, ...requestMeta(request) });
+    return json({ ok: false, error: "Invalid app or code", reason: "app_scope_mismatch" }, { status: 403 });
   }
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
   let session: string;

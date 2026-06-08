@@ -29,6 +29,7 @@ export interface PasskeyRecord {
   email: string;
   label: string;
   isAdmin: boolean;
+  appId: string | null;
   createdAt: string;
   updatedAt: string;
   lastUsedAt: string | null;
@@ -41,6 +42,7 @@ export interface EnrollmentLinkRecord {
   defaultEmail: string | null;
   defaultLabel: string | null;
   createsAdminPasskey: boolean;
+  appId: string | null;
   createdByPasskeyId: string | null;
   createdViaBootstrap: boolean;
   createdAt: string;

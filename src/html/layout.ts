@@ -55,9 +55,9 @@ export function htmlPage(title: string, body: string): Response {
     h2 { font-size: 1.05rem; margin-bottom: 0.35rem; }
     p { color: var(--muted); line-height: 1.55; }
     a { color: var(--accent); }
-    button, input { font: inherit; }
-    input { width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 0.55rem 0.7rem; background: var(--surface); color: var(--text); }
-    input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 22%, transparent); border-color: var(--accent); }
+    button, input, select { font: inherit; }
+    input, select { width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 0.55rem 0.7rem; background: var(--surface); color: var(--text); }
+    input:focus, select:focus { outline: 2px solid color-mix(in srgb, var(--accent) 22%, transparent); border-color: var(--accent); }
     label { display: grid; gap: 0.35rem; color: var(--muted); font-size: 0.9rem; }
     button { border: 1px solid var(--border); border-radius: 10px; padding: 0.55rem 0.85rem; background: var(--surface); color: var(--text); cursor: pointer; }
     button:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
@@ -79,6 +79,7 @@ export function htmlPage(title: string, body: string): Response {
     .card-body { padding: 1.2rem 1.25rem; }
     .table-wrap { overflow-x: auto; }
     .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: end; }
+    .enrollment-form { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .checkbox-row { display: flex; align-items: center; gap: 0.5rem; color: var(--text); }
     .checkbox-row input { width: auto; }
     .button-primary { background: var(--accent); border-color: var(--accent); color: white; }
@@ -90,6 +91,13 @@ export function htmlPage(title: string, body: string): Response {
     .badge-gray { background: var(--surface-soft); color: var(--muted); border: 1px solid var(--border-soft); }
     .actions { display: flex; gap: 0.45rem; align-items: center; }
     .actions form { margin: 0; }
+    .pagination { display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: end; justify-content: space-between; margin-top: 0.85rem; }
+    .pagination form { margin: 0; }
+    .pagination label { min-width: 10rem; }
+    .pagination-actions { display: flex; gap: 0.45rem; align-items: center; }
+    .pagination-link { border: 1px solid var(--border); border-radius: 10px; padding: 0.55rem 0.85rem; background: var(--surface); color: var(--text); text-decoration: none; font-size: 0.9rem; }
+    .pagination-link:not(.disabled):hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+    .pagination-link.disabled { color: var(--muted); opacity: 0.7; cursor: default; }
     .icon-button { width: 2.1rem; height: 2.1rem; display: inline-grid; place-items: center; padding: 0; font-weight: 800; font-size: 1rem; }
     .icon-save { color: var(--green); border-color: color-mix(in srgb, var(--green) 45%, var(--border)); background: var(--green-bg); }
     .icon-revoke { color: var(--red); border-color: color-mix(in srgb, var(--red) 45%, var(--border)); background: var(--red-bg); }
