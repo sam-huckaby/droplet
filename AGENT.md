@@ -165,13 +165,24 @@ The authenticated admin portal should show:
 
 ---
 
+## Vendored Repositories
+
+This project vendors external repositories under @repos/
+
+  - Use vendored repositories as read-only reference material when working with related libraries
+  - Prefer examples and patterns from the vendored source code over generated guesses or web search results
+  - Do not edit files under @repos/ unless explicitly asked
+  - Do not import from @repos/ - application code should continue importing from normal package dependencies
+
+---
+
 ## Alchemy Instructions
 
 Use Alchemy v2 for infrastructure orchestration.
 
 Before implementing or changing Alchemy stack code:
 
-1. Inspect `vendor/alchemy`.
+1. Inspect @repos/alchemy
 2. Find the actual Cloudflare Worker resource API.
 3. Find the actual Durable Object binding/migration API.
 4. Find the actual secret/var configuration style.
@@ -187,11 +198,11 @@ Wrangler may appear as an implementation detail only when Alchemy requires or in
 
 ## Effect Instructions
 
-Use Effect v4 beta.
+When writing Effect code, inspect @repos/effect/ for examples of idiomatic usage, tests, module structure, and API design. Treat it as the source of truth for Effect patterns.
 
 Before implementing or changing Effect code:
 
-1. Inspect `vendor/effect`.
+1. Inspect @repos/effect
 2. Confirm current v4 beta APIs.
 3. Prefer source-confirmed imports and patterns.
 4. Avoid stale Effect v2/v3 patterns unless verified.
@@ -299,21 +310,3 @@ Critical flows that should stay covered:
 * audit event creation
 * `ALLOWED_APPS` validation
 
----
-
-## Vendor Directory Expectations
-
-The `vendor/` directory is not decorative.
-
-It exists so coding agents can inspect the actual library source.
-
-When stuck, inspect:
-
-```txt
-vendor/alchemy
-vendor/effect
-```
-
-Use source as the authority over stale examples, memory, or assumptions.
-
-If the vendored source disagrees with documentation, prefer the source and note the discrepancy in comments or implementation notes.
