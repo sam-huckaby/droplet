@@ -178,7 +178,8 @@ This project vendors external repositories under @repos/
 
 ## Alchemy Instructions
 
-Use Alchemy v2 for infrastructure orchestration.
+When writing Alchemy code, inspect @repos/alchemy/ for examples of idiomatic usage, tests, module structure, and API design. Treat it as the source of truth for Alchemy patterns.
+
 
 Before implementing or changing Alchemy stack code:
 
