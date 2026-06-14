@@ -1,5 +1,6 @@
 import { AuthState } from "./auth-state";
 import { ConfigError, parseConfig } from "./env";
+import { handleAsset } from "./routes/assets";
 import { handleAdminApi, handleAdminPage } from "./routes/admin";
 import { handleEnrollApi, handleEnrollPage } from "./routes/enroll";
 import { handleHealth } from "./routes/health";
@@ -13,9 +14,14 @@ export { AuthState };
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
-      const config = parseConfig(env);
-
       const url = new URL(request.url);
+
+      if (request.method === "GET") {
+        const asset = handleAsset(url.pathname);
+        if (asset) return asset;
+      }
+
+      const config = parseConfig(env);
 
       if (request.method === "GET" && url.pathname === "/health") {
         return handleHealth(env);
