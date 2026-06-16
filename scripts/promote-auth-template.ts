@@ -12,6 +12,7 @@ const effectPlatformNodePackagePath = join(root, "repos/effect/packages/platform
 
 const includeEntries = [
   ".env.example",
+  "AGENT.md",
   "README.md",
   "alchemy.run.ts",
   "package.json",
